@@ -52,6 +52,8 @@ WaveGraph adalah aplikasi desktop all-in-one untuk pemrosesan sinyal dengan tiga
 
 <div align="center">
   <p><i>Gambar tampilan aplikasi akan ditampilkan di sini</i></p>
+  <img src="assets/screenshot/ss1.png" alt="WaveGraph ss1" width="600">
+  <img src="assets/screenshot/ss2.png" alt="WaveGraph ss1" width="600">
 </div>
 
 ## 🚀 Memulai
@@ -159,8 +161,3 @@ Kontribusi selalu disambut! Jika Anda ingin berkontribusi:
 Proyek ini dilisensikan di bawah Lisensi MIT - lihat file LICENSE untuk detail.
 
 ---
-
-<div align="center">
-  <p>Dibuat dengan ❤️ oleh Tim WavGraph</p>
-  <p>© 2024 WavGraph - Studio Pemrosesan Sinyal Modern</p>
-</div>
