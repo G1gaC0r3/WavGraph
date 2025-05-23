@@ -6,12 +6,14 @@ import numpy as np
 import wave
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import darkdetect
 
 from pages.firstPage import BasicStringPage
 from pages.secondPage import ImageProcessingPage
 from pages.thirdPage import AudioProcessingPage
 
-ctk.set_appearance_mode("light")
+system_appearance = darkdetect.theme()
+ctk.set_appearance_mode(system_appearance)
 ctk.set_default_color_theme("blue")
 
 class WaveGraphApp(ctk.CTk):
@@ -49,6 +51,8 @@ class WaveGraphApp(ctk.CTk):
         }
 
         self.current_mode = ctk.get_appearance_mode().lower()
+        if self.current_mode not in self.color_schemes:
+            self.current_mode = "light"
         self.colors = self.color_schemes[self.current_mode]
 
 
@@ -407,9 +411,17 @@ class WaveGraphApp(ctk.CTk):
         time = np.linspace(0, len(self.audio_data) / self.audio_params.framerate, num=len(self.audio_data))
         ax.plot(time, self.audio_data, color=self.colors["accent"])
 
-        ax.set_xlabel('Time (s)')
-        ax.set_ylabel('Amplitude')
-        ax.set_title('Audio Waveform')
+        text_color = self.colors["text"]
+
+        ax.set_xlabel('Time (s)', color=text_color)
+        ax.set_ylabel('Amplitude', color=text_color)
+        ax.set_title('Audio Waveform', color=text_color)
+
+        ax.tick_params(axis='x', colors=text_color)
+        ax.tick_params(axis='y', colors=text_color)
+
+        for spine in ax.spines.values():
+            spine.set_edgecolor(text_color)
 
         fig.patch.set_facecolor(self.colors["bg"])
         ax.set_facecolor(self.colors["medium_bg"])
@@ -510,27 +522,27 @@ class WaveGraphApp(ctk.CTk):
                 messagebox.showerror("Error", f"Failed to save audio: {str(e)}")
 
     def create_menu_bar(self):
-        menu_frame = ctk.CTkFrame(self, fg_color=self.colors["card_bg"], height=40)
-        menu_frame.pack(fill="x", padx=20, pady=(20, 0))
+        self.menu_frame = ctk.CTkFrame(self, fg_color=self.colors["card_bg"], height=40)
+        self.menu_frame.pack(fill="x", padx=20, pady=(20, 0))
 
-        title_label = ctk.CTkLabel(
-            menu_frame,
+        self.title_label = ctk.CTkLabel(
+            self.menu_frame,
             text="WaveGraph",
             font=ctk.CTkFont(family="Helvetica", size=18, weight="bold"),
             text_color=self.colors["accent"]
         )
-        title_label.pack(side="left", padx=10)
+        self.title_label.pack(side="left", padx=10)
 
-        subtitle_label = ctk.CTkLabel(
-            menu_frame,
+        self.subtitle_label = ctk.CTkLabel(
+            self.menu_frame,
             text="Signal Processing Studio",
             font=ctk.CTkFont(family="Helvetica", size=12),
             text_color=self.colors["text_secondary"]
         )
-        subtitle_label.pack(side="left", padx=5)
+        self.subtitle_label.pack(side="left", padx=5)
 
         self.appearance_mode_menu = ctk.CTkOptionMenu(
-            menu_frame,
+            self.menu_frame,
             values=["Light", "Dark"],
             command=self.change_appearance_mode,
             font=ctk.CTkFont(family="Helvetica", size=12),
@@ -546,13 +558,13 @@ class WaveGraphApp(ctk.CTk):
 
         self.appearance_mode_menu.set("Light" if self.current_mode == "light" else "Dark")
 
-        theme_label = ctk.CTkLabel(
-            menu_frame,
+        self.theme_label = ctk.CTkLabel(
+            self.menu_frame,
             text="Theme:",
             font=ctk.CTkFont(family="Helvetica", size=12),
             text_color=self.colors["text_secondary"]
         )
-        theme_label.pack(side="right", padx=5)
+        self.theme_label.pack(side="right", padx=5)
 
     def change_appearance_mode(self, new_mode):
         ctk.set_appearance_mode(new_mode)
@@ -561,6 +573,20 @@ class WaveGraphApp(ctk.CTk):
         self.colors = self.color_schemes[self.current_mode]
 
         self.configure(fg_color=self.colors["bg"])
+
+        self.menu_frame.configure(fg_color=self.colors["card_bg"])
+        self.title_label.configure(text_color=self.colors["accent"])
+        self.subtitle_label.configure(text_color=self.colors["text_secondary"])
+        self.theme_label.configure(text_color=self.colors["text_secondary"])
+
+        self.appearance_mode_menu.configure(
+            fg_color=self.colors["accent"],
+            button_color=self.colors["accent_hover"],
+            button_hover_color=self.colors["accent_hover"],
+            dropdown_fg_color=self.colors["card_bg"],
+            dropdown_hover_color=self.colors["medium_bg"],
+            dropdown_text_color=self.colors["text"]
+        )
 
         self.tabview.configure(
             fg_color=self.colors["card_bg"],
@@ -578,6 +604,7 @@ class WaveGraphApp(ctk.CTk):
             widget.destroy()
         for widget in self.tab_audio.winfo_children():
             widget.destroy()
+
         self.basic_page = BasicStringPage(self.tab_basic, self.colors)
         self.image_page = ImageProcessingPage(self.tab_image, self.colors)
         self.audio_page = AudioProcessingPage(self.tab_audio, self.colors)
