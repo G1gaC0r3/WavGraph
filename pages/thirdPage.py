@@ -54,19 +54,17 @@ class AudioProcessingPage:
         main_container.grid_columnconfigure(0, weight=1)
         main_container.grid_columnconfigure(1, weight=2)
 
-        # Create a scrollable frame for the left panel
         left_scroll_container = ctk.CTkScrollableFrame(
             main_container,
             fg_color="transparent",
             orientation="vertical",
             scrollbar_button_color=self.colors["accent"],
             scrollbar_button_hover_color=self.colors["accent_hover"],
-            width=250,  # Set a fixed width for the left panel
-            height=500  # Set a minimum height, will scroll if content is larger
+            width=250,
+            height=500
         )
         left_scroll_container.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
 
-        # Create the actual left panel inside the scrollable frame
         left_panel = ctk.CTkFrame(left_scroll_container, fg_color="transparent")
         left_panel.pack(fill="both", expand=True)
 
@@ -219,7 +217,6 @@ class AudioProcessingPage:
             padx=5
         ).pack(side="left")
 
-        # Encryption method dropdown
         encryption_method_label = ctk.CTkLabel(
             encrypt_frame,
             text="Encryption Method:",
@@ -246,7 +243,6 @@ class AudioProcessingPage:
         )
         self.audio_encryption_menu.pack(padx=15, pady=(0, 10), fill="x")
 
-        # Encryption key input
         key_label = ctk.CTkLabel(
             encrypt_frame,
             text="Encryption Key:",
@@ -298,15 +294,12 @@ class AudioProcessingPage:
         )
         decrypt_audio_btn.pack(padx=15, pady=(0, 15), fill="x")
 
-        # Create a frame for the audio control buttons
         audio_controls_frame = ctk.CTkFrame(left_panel, fg_color="transparent")
         audio_controls_frame.pack(fill="x", pady=(0, 15))
 
-        # Configure the grid for the buttons
         audio_controls_frame.grid_columnconfigure(0, weight=1)
         audio_controls_frame.grid_columnconfigure(1, weight=1)
 
-        # Play Audio button
         play_btn = ctk.CTkButton(
             audio_controls_frame,
             text="Play Audio",
@@ -323,7 +316,6 @@ class AudioProcessingPage:
         )
         play_btn.grid(row=0, column=0, padx=(0, 5), pady=0, sticky="ew")
 
-        # Save Audio button
         save_btn = ctk.CTkButton(
             audio_controls_frame,
             text="Save Audio",
@@ -340,19 +332,17 @@ class AudioProcessingPage:
         )
         save_btn.grid(row=0, column=1, padx=(5, 0), pady=0, sticky="ew")
 
-        # Create a scrollable frame for the right panel
         right_scroll_container = ctk.CTkScrollableFrame(
             main_container,
             fg_color="transparent",
             orientation="vertical",
             scrollbar_button_color=self.colors["accent"],
             scrollbar_button_hover_color=self.colors["accent_hover"],
-            width=500,  # Set a fixed width for the right panel
-            height=500  # Set a minimum height, will scroll if content is larger
+            width=500,
+            height=500
         )
         right_scroll_container.grid(row=0, column=1, sticky="nsew", padx=(10, 0))
 
-        # Create the actual right panel inside the scrollable frame
         right_panel = ctk.CTkFrame(right_scroll_container, fg_color="transparent")
         right_panel.pack(fill="both", expand=True)
 
@@ -506,9 +496,7 @@ class AudioProcessingPage:
             messagebox.showerror("Error", f"Failed to apply sinusoid: {str(e)}")
 
     def get_encryption_cipher(self, key=None):
-        """Get encryption cipher based on user key or generate new one"""
         if key:
-            # Create a key from user input
             key_bytes = key.encode('utf-8')
             # Pad or truncate to 32 bytes for Fernet
             if len(key_bytes) < 32:
@@ -522,7 +510,6 @@ class AudioProcessingPage:
             return self.cipher
 
     def encrypt_data(self, data_bytes):
-        """Encrypt audio data based on selected method"""
         encryption_method = self.audio_encryption_var.get()
         user_key = self.audio_encryption_key.get().strip()
 
@@ -540,7 +527,6 @@ class AudioProcessingPage:
                 encrypted = bytes([(b + shift) % 256 for b in data_bytes])
                 return encrypted
             elif encryption_method == "Delta Algorithm":
-                # Delta encoding: store differences between consecutive bytes
                 if len(data_bytes) == 0:
                     return data_bytes
                 delta_key = hash(user_key) % 256 if user_key else 127
@@ -556,7 +542,6 @@ class AudioProcessingPage:
             return data_bytes
 
     def decrypt_data(self, encrypted_bytes):
-        """Decrypt audio data based on selected method"""
         encryption_method = self.audio_encryption_var.get()
         user_key = self.audio_encryption_key.get().strip()
 
@@ -574,7 +559,6 @@ class AudioProcessingPage:
                 decrypted = bytes([(b + shift) % 256 for b in encrypted_bytes])
                 return decrypted
             elif encryption_method == "Delta Algorithm":
-                # Delta decoding: reconstruct original from differences
                 if len(encrypted_bytes) == 0:
                     return encrypted_bytes
                 delta_key = hash(user_key) % 256 if user_key else 127
@@ -595,13 +579,10 @@ class AudioProcessingPage:
             return
 
         try:
-            # Convert audio data to bytes
             audio_bytes = self.audio_data.tobytes()
 
-            # Encrypt using selected method
             encrypted_bytes = self.encrypt_data(audio_bytes)
 
-            # Convert back to numpy array
             self.audio_data = np.frombuffer(encrypted_bytes, dtype=np.uint8)
 
             self.update_waveform_display()
@@ -616,13 +597,10 @@ class AudioProcessingPage:
             return
 
         try:
-            # Convert audio data to bytes
             audio_bytes = bytes(self.audio_data)
 
-            # Decrypt using selected method
             decrypted_bytes = self.decrypt_data(audio_bytes)
 
-            # Convert back to original audio format
             if self.audio_params.sampwidth == 2:
                 self.audio_data = np.frombuffer(decrypted_bytes, dtype=np.int16)
             elif self.audio_params.sampwidth == 4:
@@ -662,23 +640,19 @@ class AudioProcessingPage:
             return
 
         try:
-            # Create a temporary file to play
             if self.temp_audio_file:
                 try:
                     os.unlink(self.temp_audio_file)
                 except:
                     pass
 
-            # Create a new temporary file
             fd, self.temp_audio_file = tempfile.mkstemp(suffix='.wav')
             os.close(fd)
 
-            # Write audio data to the temporary file
             with wave.open(self.temp_audio_file, 'wb') as wf:
                 wf.setparams(self.audio_params)
                 wf.writeframes(self.audio_data.tobytes())
 
-            # Play the audio file
             winsound.PlaySound(self.temp_audio_file, winsound.SND_ASYNC)
             self.is_playing = True
 

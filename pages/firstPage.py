@@ -182,7 +182,7 @@ class BasicStringPage:
             font=ctk.CTkFont(family="Helvetica", size=12)
         )
         encoding_menu.pack(side="left", fill="x", expand=True)
-        encoding_menu.set(encoding_display[0])  # Set default display value
+        encoding_menu.set(encoding_display[0])
 
         encryption_frame = ctk.CTkFrame(options_container, fg_color=self.colors["card_bg"], corner_radius=10)
         encryption_frame.grid(row=0, column=1, sticky="nsew", padx=(10, 0))
@@ -233,7 +233,6 @@ class BasicStringPage:
         encryption_menu.pack(side="left", fill="x", expand=True)
         encryption_menu.set(encryption_display[0])
 
-        # Encryption key input
         key_row = ctk.CTkFrame(encryption_options, fg_color="transparent")
         key_row.pack(fill="x", padx=10, pady=(8, 0))
 
@@ -430,9 +429,7 @@ class BasicStringPage:
             self.encoding_var.set(value_list[index])
 
     def get_encryption_cipher(self, key=None):
-        """Get encryption cipher based on user key or generate new one"""
         if key:
-            # Create a key from user input
             key_bytes = key.encode('utf-8')
             # Pad or truncate to 32 bytes for Fernet
             if len(key_bytes) < 32:
@@ -461,16 +458,13 @@ class BasicStringPage:
         """Create a tooltip for a given widget with the specified text."""
 
         def enter(event):
-            # Create a toplevel window for the tooltip
             tooltip = tk.Toplevel(widget)
-            tooltip.wm_overrideredirect(True)  # Remove window decorations
+            tooltip.wm_overrideredirect(True)
 
-            # Position the tooltip near the widget
             x, y, _, _ = widget.bbox("insert")
             x += widget.winfo_rootx() + 25
             y += widget.winfo_rooty() + 25
 
-            # Create tooltip content
             label = tk.Label(tooltip, text=text, justify="left",
                              background=self.colors["card_bg"],
                              foreground=self.colors["text"],
@@ -478,17 +472,13 @@ class BasicStringPage:
                              font=("Helvetica", 10, "normal"))
             label.pack(padx=5, pady=5)
 
-            # Position the tooltip
             tooltip.wm_geometry(f"+{x}+{y}")
 
-            # Store the tooltip reference
             widget.tooltip = tooltip
 
         def leave(event):
-            # Destroy the tooltip when mouse leaves
             if hasattr(widget, "tooltip"):
                 widget.tooltip.destroy()
 
-        # Bind events to show/hide tooltip
         widget.bind("<Enter>", enter)
         widget.bind("<Leave>", leave)

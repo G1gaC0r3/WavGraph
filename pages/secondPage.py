@@ -45,14 +45,13 @@ class ImageProcessingPage:
         main_container.grid_columnconfigure(1, weight=2)
         main_container.grid_rowconfigure(0, weight=1)
 
-        # Create scrollable frame for left panel with fixed width
         left_panel = ctk.CTkScrollableFrame(
             main_container,
             fg_color="transparent",
             scrollbar_button_color=self.colors["accent"],
             scrollbar_button_hover_color=self.colors["accent_hover"],
-            width=300,  # Set fixed width to prevent pushing
-            height=500  # Set minimum height
+            width=300,
+            height=500
         )
         left_panel.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
 
@@ -114,7 +113,6 @@ class ImageProcessingPage:
         )
         self.encoding_menu.pack(padx=15, pady=(0, 10), fill="x")
 
-        # Encryption method dropdown
         encryption_label = ctk.CTkLabel(
             img_select_frame,
             text="Encryption Method:",
@@ -141,7 +139,6 @@ class ImageProcessingPage:
         )
         self.encryption_menu.pack(padx=15, pady=(0, 10), fill="x")
 
-        # Encryption key input
         key_label = ctk.CTkLabel(
             img_select_frame,
             text="Encryption Key:",
@@ -269,19 +266,17 @@ class ImageProcessingPage:
         )
         save_btn.grid(row=0, column=1, padx=(5, 0), pady=5, sticky="ew")
 
-        # Create scrollable frame for right panel
         right_scroll_container = ctk.CTkScrollableFrame(
             main_container,
             fg_color="transparent",
             orientation="vertical",
             scrollbar_button_color=self.colors["accent"],
             scrollbar_button_hover_color=self.colors["accent_hover"],
-            width=500,  # Set fixed width for the right panel
-            height=500  # Set minimum height
+            width=500,
+            height=500
         )
         right_scroll_container.grid(row=0, column=1, sticky="nsew", padx=(10, 0))
 
-        # Create the actual right panel inside the scrollable frame
         right_panel = ctk.CTkFrame(right_scroll_container, fg_color="transparent")
         right_panel.pack(fill="both", expand=True)
 
@@ -334,21 +329,17 @@ class ImageProcessingPage:
         if self.image_data:
             img_copy = self.image_data.copy()
 
-            # Set maximum display size to fit within the preview area
-            max_display_width = 450  # Maximum width for display
-            max_display_height = 400  # Maximum height for display
+            max_display_width = 450
+            max_display_height = 400
 
-            # Calculate the scaling factor to fit within the preview area
             img_width, img_height = img_copy.size
             scale_width = max_display_width / img_width
             scale_height = max_display_height / img_height
-            scale_factor = min(scale_width, scale_height, 1.0)  # Don't upscale
+            scale_factor = min(scale_width, scale_height, 1.0)
 
-            # Calculate new size
             new_width = int(img_width * scale_factor)
             new_height = int(img_height * scale_factor)
 
-            # Resize the image
             img_copy = img_copy.resize((new_width, new_height), Image.Resampling.LANCZOS)
 
             border_size = 5
@@ -364,7 +355,6 @@ class ImageProcessingPage:
 
             bg.paste(img_copy, (border_size, border_size))
 
-            # Use a fixed display size that fits within the container
             display_width = min(bg.width, max_display_width)
             display_height = min(bg.height, max_display_height)
 
@@ -381,9 +371,7 @@ class ImageProcessingPage:
         return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
 
     def get_encryption_cipher(self, key=None):
-        """Get encryption cipher based on user key or generate new one"""
         if key:
-            # Create a key from user input
             key_bytes = key.encode('utf-8')
             # Pad or truncate to 32 bytes for Fernet
             if len(key_bytes) < 32:
@@ -397,7 +385,6 @@ class ImageProcessingPage:
             return self.cipher
 
     def encrypt_message(self, message):
-        """Encrypt message based on selected method"""
         encryption_method = self.steg_encryption_var.get()
         user_key = self.encryption_key.get().strip()
 
@@ -424,7 +411,6 @@ class ImageProcessingPage:
             return message
 
     def decrypt_message(self, encrypted_message):
-        """Decrypt message based on selected method"""
         encryption_method = self.steg_encryption_var.get()
         user_key = self.encryption_key.get().strip()
 
@@ -465,10 +451,8 @@ class ImageProcessingPage:
             if self.image_data.mode not in ['RGB', 'RGBA']:
                 self.image_data = self.image_data.convert('RGB')
 
-            # First encrypt the message
             encrypted_message = self.encrypt_message(message)
 
-            # Then apply encoding
             encoding_method = self.steg_encoding_var.get()
 
             if encoding_method == "Base64":
@@ -532,7 +516,6 @@ class ImageProcessingPage:
                 except ValueError:
                     continue
 
-            # First decode the message
             encoding_method = self.steg_encoding_var.get()
 
             if encoding_method == "Base64":
@@ -551,7 +534,6 @@ class ImageProcessingPage:
                 except Exception:
                     messagebox.showwarning("Warning", "Failed to decode Reverse Bits. The message may not be encoded with reversed bits.")
 
-            # Then decrypt the message
             decrypted_message = self.decrypt_message(message)
 
             self.steg_message.delete("1.0", "end")
@@ -631,7 +613,6 @@ class ImageProcessingPage:
                 except Exception:
                     pass
 
-            # Decrypt the decoded message
             decrypted_message = self.decrypt_message(decoded_message)
 
             if not message:
