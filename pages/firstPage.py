@@ -233,6 +233,28 @@ class BasicStringPage:
         encryption_menu.pack(side="left", fill="x", expand=True)
         encryption_menu.set(encryption_display[0])
 
+        # Encryption key input
+        key_row = ctk.CTkFrame(encryption_options, fg_color="transparent")
+        key_row.pack(fill="x", padx=10, pady=(8, 0))
+
+        ctk.CTkLabel(
+            key_row,
+            text="Encryption Key:",
+            font=ctk.CTkFont(family="Helvetica", size=12),
+            text_color=self.colors["text"]
+        ).pack(side="left", padx=(0, 10))
+
+        self.encryption_key = ctk.CTkEntry(
+            key_row,
+            placeholder_text="Enter key (optional)",
+            fg_color=self.colors["medium_bg"],
+            text_color=self.colors["text"],
+            border_width=0,
+            corner_radius=8,
+            font=ctk.CTkFont(family="Helvetica", size=12)
+        )
+        self.encryption_key.pack(side="left", fill="x", expand=True)
+
         buttons_frame = ctk.CTkFrame(self.parent, fg_color=self.colors["card_bg"], corner_radius=10)
         buttons_frame.pack(fill="x", padx=20, pady=(0, 20))
 
@@ -332,18 +354,21 @@ class BasicStringPage:
         text = self.input_text.get("1.0", "end-1c")
         if text:
             encryption_method = self.encryption_var.get()
+            user_key = self.encryption_key.get().strip()
             try:
                 if encryption_method == "fernet":
-                    encrypted = self.cipher.encrypt(text.encode()).decode()
+                    cipher = self.get_encryption_cipher(user_key if user_key else None)
+                    encrypted = cipher.encrypt(text.encode()).decode()
                 elif encryption_method == "xor":
-                    key = 42
+                    key = hash(user_key) % 256 if user_key else 42
                     encrypted = "".join([chr(ord(c) ^ key) for c in text])
                     encrypted = base64.b64encode(encrypted.encode()).decode()
                 elif encryption_method == "caesar":
-                    shift = 3
+                    shift = len(user_key) % 26 if user_key else 3
                     encrypted = "".join([chr((ord(c) - 32 + shift) % 94 + 32) if 32 <= ord(c) < 126 else c for c in text])
                 else:
-                    encrypted = self.cipher.encrypt(text.encode()).decode()
+                    cipher = self.get_encryption_cipher(user_key if user_key else None)
+                    encrypted = cipher.encrypt(text.encode()).decode()
 
                 self.output_text.configure(state="normal")
                 self.output_text.delete("1.0", "end")
@@ -358,18 +383,21 @@ class BasicStringPage:
         text = self.input_text.get("1.0", "end-1c")
         if text:
             encryption_method = self.encryption_var.get()
+            user_key = self.encryption_key.get().strip()
             try:
                 if encryption_method == "fernet":
-                    decrypted = self.cipher.decrypt(text.encode()).decode()
+                    cipher = self.get_encryption_cipher(user_key if user_key else None)
+                    decrypted = cipher.decrypt(text.encode()).decode()
                 elif encryption_method == "xor":
-                    key = 42
+                    key = hash(user_key) % 256 if user_key else 42
                     decoded = base64.b64decode(text).decode()
                     decrypted = "".join([chr(ord(c) ^ key) for c in decoded])
                 elif encryption_method == "caesar":
-                    shift = -3
+                    shift = -(len(user_key) % 26) if user_key else -3
                     decrypted = "".join([chr((ord(c) - 32 + shift) % 94 + 32) if 32 <= ord(c) < 126 else c for c in text])
                 else:
-                    decrypted = self.cipher.decrypt(text.encode()).decode()
+                    cipher = self.get_encryption_cipher(user_key if user_key else None)
+                    decrypted = cipher.decrypt(text.encode()).decode()
 
                 self.output_text.configure(state="normal")
                 self.output_text.delete("1.0", "end")
@@ -400,6 +428,22 @@ class BasicStringPage:
         if choice in display_list:
             index = display_list.index(choice)
             self.encoding_var.set(value_list[index])
+
+    def get_encryption_cipher(self, key=None):
+        """Get encryption cipher based on user key or generate new one"""
+        if key:
+            # Create a key from user input
+            key_bytes = key.encode('utf-8')
+            # Pad or truncate to 32 bytes for Fernet
+            if len(key_bytes) < 32:
+                key_bytes = key_bytes.ljust(32, b'0')
+            else:
+                key_bytes = key_bytes[:32]
+            # Encode to base64 for Fernet
+            fernet_key = base64.urlsafe_b64encode(key_bytes)
+            return Fernet(fernet_key)
+        else:
+            return self.cipher
 
     def swap_text(self):
         input_content = self.input_text.get("1.0", "end-1c")

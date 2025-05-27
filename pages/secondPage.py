@@ -5,6 +5,8 @@ from PIL import Image
 import numpy as np
 import io
 import os
+import base64
+from cryptography.fernet import Fernet
 
 class ImageProcessingPage:
     def __init__(self, parent, colors):
@@ -12,6 +14,7 @@ class ImageProcessingPage:
         self.colors = colors
         self.image_path = None
         self.image_data = None
+        self.cipher = Fernet(Fernet.generate_key())
 
         self.icons = {
             "image_ops": self.load_icon("assets/second_tab/gallery.png", (24, 24)),
@@ -40,8 +43,17 @@ class ImageProcessingPage:
 
         main_container.grid_columnconfigure(0, weight=1)
         main_container.grid_columnconfigure(1, weight=2)
+        main_container.grid_rowconfigure(0, weight=1)
 
-        left_panel = ctk.CTkFrame(main_container, fg_color="transparent")
+        # Create scrollable frame for left panel with fixed width
+        left_panel = ctk.CTkScrollableFrame(
+            main_container,
+            fg_color="transparent",
+            scrollbar_button_color=self.colors["accent"],
+            scrollbar_button_hover_color=self.colors["accent_hover"],
+            width=300,  # Set fixed width to prevent pushing
+            height=500  # Set minimum height
+        )
         left_panel.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
 
         img_select_frame = ctk.CTkFrame(left_panel, fg_color=self.colors["card_bg"], corner_radius=10)
@@ -100,7 +112,54 @@ class ImageProcessingPage:
             font=ctk.CTkFont(family="Helvetica", size=12),
             width=120
         )
-        self.encoding_menu.pack(padx=15, pady=(0, 15), fill="x")
+        self.encoding_menu.pack(padx=15, pady=(0, 10), fill="x")
+
+        # Encryption method dropdown
+        encryption_label = ctk.CTkLabel(
+            img_select_frame,
+            text="Encryption Method:",
+            font=ctk.CTkFont(family="Helvetica", size=12),
+            text_color=self.colors["text"]
+        )
+        encryption_label.pack(anchor="w", padx=15, pady=(5, 0))
+
+        self.steg_encryption_var = tk.StringVar(value="none")
+        encryption_methods = ["None", "Fernet (AES)", "XOR", "Caesar Cipher"]
+
+        self.encryption_menu = ctk.CTkOptionMenu(
+            img_select_frame,
+            values=encryption_methods,
+            variable=self.steg_encryption_var,
+            fg_color=self.colors["medium_bg"],
+            button_color=self.colors["accent"],
+            button_hover_color=self.colors["accent_hover"],
+            dropdown_fg_color=self.colors["card_bg"],
+            dropdown_hover_color=self.colors["medium_bg"],
+            dropdown_text_color=self.colors["text"],
+            font=ctk.CTkFont(family="Helvetica", size=12),
+            width=120
+        )
+        self.encryption_menu.pack(padx=15, pady=(0, 10), fill="x")
+
+        # Encryption key input
+        key_label = ctk.CTkLabel(
+            img_select_frame,
+            text="Encryption Key:",
+            font=ctk.CTkFont(family="Helvetica", size=12),
+            text_color=self.colors["text"]
+        )
+        key_label.pack(anchor="w", padx=15, pady=(5, 0))
+
+        self.encryption_key = ctk.CTkEntry(
+            img_select_frame,
+            placeholder_text="Enter encryption key (leave empty for auto-generated)",
+            fg_color=self.colors["medium_bg"],
+            text_color=self.colors["text"],
+            border_width=0,
+            corner_radius=8,
+            font=ctk.CTkFont(family="Helvetica", size=12)
+        )
+        self.encryption_key.pack(padx=15, pady=(0, 15), fill="x")
 
         steg_frame = ctk.CTkFrame(left_panel, fg_color=self.colors["card_bg"], corner_radius=10)
         steg_frame.pack(fill="x", pady=(0, 15))
@@ -210,8 +269,21 @@ class ImageProcessingPage:
         )
         save_btn.grid(row=0, column=1, padx=(5, 0), pady=5, sticky="ew")
 
-        right_panel = ctk.CTkFrame(main_container, fg_color="transparent")
-        right_panel.grid(row=0, column=1, sticky="nsew", padx=(10, 0))
+        # Create scrollable frame for right panel
+        right_scroll_container = ctk.CTkScrollableFrame(
+            main_container,
+            fg_color="transparent",
+            orientation="vertical",
+            scrollbar_button_color=self.colors["accent"],
+            scrollbar_button_hover_color=self.colors["accent_hover"],
+            width=500,  # Set fixed width for the right panel
+            height=500  # Set minimum height
+        )
+        right_scroll_container.grid(row=0, column=1, sticky="nsew", padx=(10, 0))
+
+        # Create the actual right panel inside the scrollable frame
+        right_panel = ctk.CTkFrame(right_scroll_container, fg_color="transparent")
+        right_panel.pack(fill="both", expand=True)
 
         preview_frame = ctk.CTkFrame(right_panel, fg_color=self.colors["card_bg"], corner_radius=10)
         preview_frame.pack(fill="both", expand=True)
@@ -262,7 +334,22 @@ class ImageProcessingPage:
         if self.image_data:
             img_copy = self.image_data.copy()
 
-            img_copy.thumbnail((400, 400))
+            # Set maximum display size to fit within the preview area
+            max_display_width = 450  # Maximum width for display
+            max_display_height = 400  # Maximum height for display
+
+            # Calculate the scaling factor to fit within the preview area
+            img_width, img_height = img_copy.size
+            scale_width = max_display_width / img_width
+            scale_height = max_display_height / img_height
+            scale_factor = min(scale_width, scale_height, 1.0)  # Don't upscale
+
+            # Calculate new size
+            new_width = int(img_width * scale_factor)
+            new_height = int(img_height * scale_factor)
+
+            # Resize the image
+            img_copy = img_copy.resize((new_width, new_height), Image.Resampling.LANCZOS)
 
             border_size = 5
             mode = img_copy.mode
@@ -277,7 +364,11 @@ class ImageProcessingPage:
 
             bg.paste(img_copy, (border_size, border_size))
 
-            ctk_image = ctk.CTkImage(light_image=bg, dark_image=bg, size=(bg.width, bg.height))
+            # Use a fixed display size that fits within the container
+            display_width = min(bg.width, max_display_width)
+            display_height = min(bg.height, max_display_height)
+
+            ctk_image = ctk.CTkImage(light_image=bg, dark_image=bg, size=(display_width, display_height))
 
             self.image_preview.configure(
                 image=ctk_image,
@@ -288,6 +379,77 @@ class ImageProcessingPage:
     def hex_to_rgb(self, hex_color):
         hex_color = hex_color.lstrip('#')
         return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+
+    def get_encryption_cipher(self, key=None):
+        """Get encryption cipher based on user key or generate new one"""
+        if key:
+            # Create a key from user input
+            key_bytes = key.encode('utf-8')
+            # Pad or truncate to 32 bytes for Fernet
+            if len(key_bytes) < 32:
+                key_bytes = key_bytes.ljust(32, b'0')
+            else:
+                key_bytes = key_bytes[:32]
+            # Encode to base64 for Fernet
+            fernet_key = base64.urlsafe_b64encode(key_bytes)
+            return Fernet(fernet_key)
+        else:
+            return self.cipher
+
+    def encrypt_message(self, message):
+        """Encrypt message based on selected method"""
+        encryption_method = self.steg_encryption_var.get()
+        user_key = self.encryption_key.get().strip()
+
+        if encryption_method == "None":
+            return message
+
+        try:
+            if encryption_method == "Fernet (AES)":
+                cipher = self.get_encryption_cipher(user_key if user_key else None)
+                encrypted = cipher.encrypt(message.encode()).decode()
+                return encrypted
+            elif encryption_method == "XOR":
+                key = hash(user_key) % 256 if user_key else 42
+                encrypted = "".join([chr(ord(c) ^ key) for c in message])
+                return base64.b64encode(encrypted.encode()).decode()
+            elif encryption_method == "Caesar Cipher":
+                shift = len(user_key) % 26 if user_key else 3
+                encrypted = "".join([chr((ord(c) - 32 + shift) % 94 + 32) if 32 <= ord(c) < 126 else c for c in message])
+                return encrypted
+            else:
+                return message
+        except Exception as e:
+            messagebox.showerror("Encryption Error", f"Failed to encrypt message: {str(e)}")
+            return message
+
+    def decrypt_message(self, encrypted_message):
+        """Decrypt message based on selected method"""
+        encryption_method = self.steg_encryption_var.get()
+        user_key = self.encryption_key.get().strip()
+
+        if encryption_method == "None":
+            return encrypted_message
+
+        try:
+            if encryption_method == "Fernet (AES)":
+                cipher = self.get_encryption_cipher(user_key if user_key else None)
+                decrypted = cipher.decrypt(encrypted_message.encode()).decode()
+                return decrypted
+            elif encryption_method == "XOR":
+                key = hash(user_key) % 256 if user_key else 42
+                decoded = base64.b64decode(encrypted_message).decode()
+                decrypted = "".join([chr(ord(c) ^ key) for c in decoded])
+                return decrypted
+            elif encryption_method == "Caesar Cipher":
+                shift = -(len(user_key) % 26) if user_key else -3
+                decrypted = "".join([chr((ord(c) - 32 + shift) % 94 + 32) if 32 <= ord(c) < 126 else c for c in encrypted_message])
+                return decrypted
+            else:
+                return encrypted_message
+        except Exception as e:
+            messagebox.showerror("Decryption Error", f"Failed to decrypt message: {str(e)}")
+            return encrypted_message
 
     def encode_steganography(self):
         if not self.image_data:
@@ -303,19 +465,22 @@ class ImageProcessingPage:
             if self.image_data.mode not in ['RGB', 'RGBA']:
                 self.image_data = self.image_data.convert('RGB')
 
+            # First encrypt the message
+            encrypted_message = self.encrypt_message(message)
+
+            # Then apply encoding
             encoding_method = self.steg_encoding_var.get()
 
             if encoding_method == "Base64":
-                import base64
-                message = base64.b64encode(message.encode()).decode()
+                encrypted_message = base64.b64encode(encrypted_message.encode()).decode()
             elif encoding_method == "ASCII":
-                message = "".join([f"\\x{ord(c):02x}" for c in message])
+                encrypted_message = "".join([f"\\x{ord(c):02x}" for c in encrypted_message])
             elif encoding_method == "Reverse Bits":
-                message = "".join([chr(int(format(ord(c), '08b')[::-1], 2)) for c in message])
+                encrypted_message = "".join([chr(int(format(ord(c), '08b')[::-1], 2)) for c in encrypted_message])
 
             img_array = np.array(self.image_data, dtype=np.uint8)
 
-            binary_message = ''.join(format(ord(char), '08b') for char in message)
+            binary_message = ''.join(format(ord(char), '08b') for char in encrypted_message)
             binary_message += '00000000'
 
             if img_array.size < len(binary_message):
@@ -333,7 +498,8 @@ class ImageProcessingPage:
             self.image_data = Image.fromarray(steg_array, mode=self.image_data.mode)
             self.update_image_preview()
 
-            messagebox.showinfo("Success", f"Message hidden successfully using {encoding_method if encoding_method != 'None' else 'no'} encoding!")
+            encryption_method = self.steg_encryption_var.get()
+            messagebox.showinfo("Success", f"Message hidden successfully using {encoding_method if encoding_method != 'None' else 'no'} encoding and {encryption_method if encryption_method != 'None' else 'no'} encryption!")
         except Exception as e:
             messagebox.showerror("Error", f"Failed to encode message: {str(e)}")
 
@@ -366,11 +532,11 @@ class ImageProcessingPage:
                 except ValueError:
                     continue
 
+            # First decode the message
             encoding_method = self.steg_encoding_var.get()
 
             if encoding_method == "Base64":
                 try:
-                    import base64
                     message = base64.b64decode(message).decode()
                 except Exception:
                     messagebox.showwarning("Warning", "Failed to decode Base64. The message may not be Base64 encoded.")
@@ -385,10 +551,14 @@ class ImageProcessingPage:
                 except Exception:
                     messagebox.showwarning("Warning", "Failed to decode Reverse Bits. The message may not be encoded with reversed bits.")
 
-            self.steg_message.delete("1.0", "end")
-            self.steg_message.insert("1.0", message)
+            # Then decrypt the message
+            decrypted_message = self.decrypt_message(message)
 
-            messagebox.showinfo("Success", f"Message extracted successfully using {encoding_method if encoding_method != 'None' else 'no'} decoding!")
+            self.steg_message.delete("1.0", "end")
+            self.steg_message.insert("1.0", decrypted_message)
+
+            encryption_method = self.steg_encryption_var.get()
+            messagebox.showinfo("Success", f"Message extracted successfully using {encoding_method if encoding_method != 'None' else 'no'} decoding and {encryption_method if encryption_method != 'None' else 'no'} decryption!")
         except Exception as e:
             messagebox.showerror("Error", f"Failed to decode message: {str(e)}")
 
@@ -447,7 +617,6 @@ class ImageProcessingPage:
 
             if encoding_method == "Base64":
                 try:
-                    import base64
                     decoded_message = base64.b64decode(message).decode()
                 except Exception:
                     pass
@@ -461,6 +630,9 @@ class ImageProcessingPage:
                     decoded_message = "".join([chr(int(format(ord(c), '08b')[::-1], 2)) for c in message])
                 except Exception:
                     pass
+
+            # Decrypt the decoded message
+            decrypted_message = self.decrypt_message(decoded_message)
 
             if not message:
                 messagebox.showinfo("Secret Message", "No hidden message found in this image.")
@@ -480,9 +652,10 @@ class ImageProcessingPage:
             header = ctk.CTkFrame(frame, fg_color="transparent", height=40)
             header.pack(fill="x", padx=15, pady=(15, 5))
 
+            encryption_method = self.steg_encryption_var.get()
             ctk.CTkLabel(
                 header,
-                text=f"Secret Message ({encoding_method})",
+                text=f"Secret Message ({encoding_method} + {encryption_method})",
                 image=self.icons["preview"],
                 compound="left",
                 font=ctk.CTkFont(family="Helvetica", size=14, weight="bold"),
@@ -504,6 +677,7 @@ class ImageProcessingPage:
 
             raw_tab = tab_view.add("Raw")
             decoded_tab = tab_view.add("Decoded")
+            decrypted_tab = tab_view.add("Decrypted")
 
             raw_display = ctk.CTkTextbox(
                 raw_tab,
@@ -528,6 +702,18 @@ class ImageProcessingPage:
             decoded_display.pack(fill="both", expand=True, padx=10, pady=10)
             decoded_display.insert("1.0", decoded_message)
             decoded_display.configure(state="disabled")
+
+            decrypted_display = ctk.CTkTextbox(
+                decrypted_tab,
+                fg_color=self.colors["medium_bg"],
+                text_color=self.colors["text"],
+                border_width=0,
+                corner_radius=8,
+                font=ctk.CTkFont(family="Helvetica", size=12)
+            )
+            decrypted_display.pack(fill="both", expand=True, padx=10, pady=10)
+            decrypted_display.insert("1.0", decrypted_message)
+            decrypted_display.configure(state="disabled")
 
             close_btn = ctk.CTkButton(
                 frame,

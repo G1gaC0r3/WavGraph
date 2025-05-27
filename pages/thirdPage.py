@@ -10,6 +10,7 @@ import os
 import tempfile
 import winsound
 from PIL import Image
+import base64
 
 class AudioProcessingPage:
     def __init__(self, parent, colors):
@@ -217,6 +218,53 @@ class AudioProcessingPage:
             text_color=self.colors["text"],
             padx=5
         ).pack(side="left")
+
+        # Encryption method dropdown
+        encryption_method_label = ctk.CTkLabel(
+            encrypt_frame,
+            text="Encryption Method:",
+            font=ctk.CTkFont(family="Helvetica", size=12),
+            text_color=self.colors["text"]
+        )
+        encryption_method_label.pack(anchor="w", padx=15, pady=(5, 0))
+
+        self.audio_encryption_var = tk.StringVar(value="Fernet (AES)")
+        encryption_methods = ["Fernet (AES)", "XOR", "Caesar Cipher", "Delta Algorithm"]
+
+        self.audio_encryption_menu = ctk.CTkOptionMenu(
+            encrypt_frame,
+            values=encryption_methods,
+            variable=self.audio_encryption_var,
+            fg_color=self.colors["medium_bg"],
+            button_color=self.colors["accent"],
+            button_hover_color=self.colors["accent_hover"],
+            dropdown_fg_color=self.colors["card_bg"],
+            dropdown_hover_color=self.colors["medium_bg"],
+            dropdown_text_color=self.colors["text"],
+            font=ctk.CTkFont(family="Helvetica", size=12),
+            width=120
+        )
+        self.audio_encryption_menu.pack(padx=15, pady=(0, 10), fill="x")
+
+        # Encryption key input
+        key_label = ctk.CTkLabel(
+            encrypt_frame,
+            text="Encryption Key:",
+            font=ctk.CTkFont(family="Helvetica", size=12),
+            text_color=self.colors["text"]
+        )
+        key_label.pack(anchor="w", padx=15, pady=(5, 0))
+
+        self.audio_encryption_key = ctk.CTkEntry(
+            encrypt_frame,
+            placeholder_text="Enter encryption key (leave empty for auto-generated)",
+            fg_color=self.colors["medium_bg"],
+            text_color=self.colors["text"],
+            border_width=0,
+            corner_radius=8,
+            font=ctk.CTkFont(family="Helvetica", size=12)
+        )
+        self.audio_encryption_key.pack(padx=15, pady=(0, 15), fill="x")
 
         encrypt_audio_btn = ctk.CTkButton(
             encrypt_frame,
@@ -457,20 +505,108 @@ class AudioProcessingPage:
         except Exception as e:
             messagebox.showerror("Error", f"Failed to apply sinusoid: {str(e)}")
 
+    def get_encryption_cipher(self, key=None):
+        """Get encryption cipher based on user key or generate new one"""
+        if key:
+            # Create a key from user input
+            key_bytes = key.encode('utf-8')
+            # Pad or truncate to 32 bytes for Fernet
+            if len(key_bytes) < 32:
+                key_bytes = key_bytes.ljust(32, b'0')
+            else:
+                key_bytes = key_bytes[:32]
+            # Encode to base64 for Fernet
+            fernet_key = base64.urlsafe_b64encode(key_bytes)
+            return Fernet(fernet_key)
+        else:
+            return self.cipher
+
+    def encrypt_data(self, data_bytes):
+        """Encrypt audio data based on selected method"""
+        encryption_method = self.audio_encryption_var.get()
+        user_key = self.audio_encryption_key.get().strip()
+
+        try:
+            if encryption_method == "Fernet (AES)":
+                cipher = self.get_encryption_cipher(user_key if user_key else None)
+                encrypted = cipher.encrypt(data_bytes)
+                return encrypted
+            elif encryption_method == "XOR":
+                key = hash(user_key) % 256 if user_key else 42
+                encrypted = bytes([b ^ key for b in data_bytes])
+                return encrypted
+            elif encryption_method == "Caesar Cipher":
+                shift = len(user_key) % 256 if user_key else 3
+                encrypted = bytes([(b + shift) % 256 for b in data_bytes])
+                return encrypted
+            elif encryption_method == "Delta Algorithm":
+                # Delta encoding: store differences between consecutive bytes
+                if len(data_bytes) == 0:
+                    return data_bytes
+                delta_key = hash(user_key) % 256 if user_key else 127
+                encrypted = bytearray([data_bytes[0] ^ delta_key])
+                for i in range(1, len(data_bytes)):
+                    delta = (data_bytes[i] - data_bytes[i-1] + delta_key) % 256
+                    encrypted.append(delta)
+                return bytes(encrypted)
+            else:
+                return data_bytes
+        except Exception as e:
+            messagebox.showerror("Encryption Error", f"Failed to encrypt audio: {str(e)}")
+            return data_bytes
+
+    def decrypt_data(self, encrypted_bytes):
+        """Decrypt audio data based on selected method"""
+        encryption_method = self.audio_encryption_var.get()
+        user_key = self.audio_encryption_key.get().strip()
+
+        try:
+            if encryption_method == "Fernet (AES)":
+                cipher = self.get_encryption_cipher(user_key if user_key else None)
+                decrypted = cipher.decrypt(encrypted_bytes)
+                return decrypted
+            elif encryption_method == "XOR":
+                key = hash(user_key) % 256 if user_key else 42
+                decrypted = bytes([b ^ key for b in encrypted_bytes])
+                return decrypted
+            elif encryption_method == "Caesar Cipher":
+                shift = -(len(user_key) % 256) if user_key else -3
+                decrypted = bytes([(b + shift) % 256 for b in encrypted_bytes])
+                return decrypted
+            elif encryption_method == "Delta Algorithm":
+                # Delta decoding: reconstruct original from differences
+                if len(encrypted_bytes) == 0:
+                    return encrypted_bytes
+                delta_key = hash(user_key) % 256 if user_key else 127
+                decrypted = bytearray([encrypted_bytes[0] ^ delta_key])
+                for i in range(1, len(encrypted_bytes)):
+                    original_byte = (decrypted[i-1] + encrypted_bytes[i] - delta_key) % 256
+                    decrypted.append(original_byte)
+                return bytes(decrypted)
+            else:
+                return encrypted_bytes
+        except Exception as e:
+            messagebox.showerror("Decryption Error", f"Failed to decrypt audio: {str(e)}")
+            return encrypted_bytes
+
     def encrypt_audio(self):
         if self.audio_data is None:
             messagebox.showwarning("Warning", "Please load an audio file first.")
             return
 
         try:
+            # Convert audio data to bytes
             audio_bytes = self.audio_data.tobytes()
 
-            encrypted_bytes = self.cipher.encrypt(audio_bytes)
+            # Encrypt using selected method
+            encrypted_bytes = self.encrypt_data(audio_bytes)
 
+            # Convert back to numpy array
             self.audio_data = np.frombuffer(encrypted_bytes, dtype=np.uint8)
 
             self.update_waveform_display()
-            messagebox.showinfo("Success", "Audio encrypted successfully!")
+            encryption_method = self.audio_encryption_var.get()
+            messagebox.showinfo("Success", f"Audio encrypted successfully using {encryption_method}!")
         except Exception as e:
             messagebox.showerror("Error", f"Failed to encrypt audio: {str(e)}")
 
@@ -480,10 +616,13 @@ class AudioProcessingPage:
             return
 
         try:
+            # Convert audio data to bytes
             audio_bytes = bytes(self.audio_data)
 
-            decrypted_bytes = self.cipher.decrypt(audio_bytes)
+            # Decrypt using selected method
+            decrypted_bytes = self.decrypt_data(audio_bytes)
 
+            # Convert back to original audio format
             if self.audio_params.sampwidth == 2:
                 self.audio_data = np.frombuffer(decrypted_bytes, dtype=np.int16)
             elif self.audio_params.sampwidth == 4:
@@ -492,7 +631,8 @@ class AudioProcessingPage:
                 self.audio_data = np.frombuffer(decrypted_bytes, dtype=np.uint8)
 
             self.update_waveform_display()
-            messagebox.showinfo("Success", "Audio decrypted successfully!")
+            encryption_method = self.audio_encryption_var.get()
+            messagebox.showinfo("Success", f"Audio decrypted successfully using {encryption_method}!")
         except Exception as e:
             messagebox.showerror("Error", f"Failed to decrypt audio: {str(e)}")
 
